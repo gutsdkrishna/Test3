@@ -1,20 +1,27 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, ScrollView } from 'react-native';
-import { Text, Card, Button, List, Switch, ActivityIndicator } from 'react-native-paper';
+import { StyleSheet, View, ScrollView, Alert } from 'react-native';
+import { Text, Card, Button, List, Switch, ActivityIndicator, Banner } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { collectDeviceMetrics, type DeviceMetrics } from '../services/DeviceMetrics';
 import { getAIOptimizations, type OptimizationResult } from '../services/AIOptimization';
 
-export default function OptimizeScreen() {
+export default function OptimizeScreen({ navigation }: any) {
     const [optimizing, setOptimizing] = useState(false);
     const [optimizationResult, setOptimizationResult] = useState<OptimizationResult | null>(null);
     const [aiEnabled, setAiEnabled] = useState(true);
     const [deviceMetrics, setDeviceMetrics] = useState<DeviceMetrics | null>(null);
+    const [banner, setBanner] = useState<{ visible: boolean, message: string, type: 'success' | 'warning' | 'error' }>({
+        visible: false,
+        message: '',
+        type: 'success'
+    });
 
     const startOptimization = async () => {
         setOptimizing(true);
         setOptimizationResult(null);
+        setBanner({ visible: false, message: '', type: 'success' });
 
         try {
             // Step 1: Collect device metrics directly from the Android device
@@ -27,6 +34,21 @@ export default function OptimizeScreen() {
                 console.log("Getting AI optimizations...");
                 const result = await getAIOptimizations(metrics);
                 setOptimizationResult(result);
+
+                // Show banner based on AI success
+                if (result.aiSuccessful) {
+                    setBanner({
+                        visible: true,
+                        message: "AI successfully optimized your device!",
+                        type: 'success'
+                    });
+                } else {
+                    setBanner({
+                        visible: true,
+                        message: "AI optimization not available right now. Using basic optimization.",
+                        type: 'warning'
+                    });
+                }
             } else {
                 // Simple optimization without AI
                 console.log("Using basic optimization (AI disabled)");
@@ -46,7 +68,14 @@ export default function OptimizeScreen() {
                         "Update your apps regularly",
                         "Remove unused applications",
                         "Restart your device weekly"
-                    ]
+                    ],
+                    aiSuccessful: false
+                });
+
+                setBanner({
+                    visible: true,
+                    message: "Basic optimization applied (AI disabled)",
+                    type: 'success'
                 });
             }
         } catch (error) {
@@ -66,7 +95,15 @@ export default function OptimizeScreen() {
                 recommendations: [
                     "Check for system updates",
                     "Consider device maintenance"
-                ]
+                ],
+                aiSuccessful: false,
+                message: "Could not connect to AI service"
+            });
+
+            setBanner({
+                visible: true,
+                message: "Optimization error. Using basic optimization instead.",
+                type: 'error'
             });
         } finally {
             setOptimizing(false);
@@ -80,6 +117,31 @@ export default function OptimizeScreen() {
     return (
         <SafeAreaView style={styles.container}>
             <ScrollView contentContainerStyle={styles.scrollContent}>
+                {banner.visible && (
+                    <Banner
+                        visible={banner.visible}
+                        actions={[
+                            {
+                                label: 'Dismiss',
+                                onPress: () => setBanner({ ...banner, visible: false }),
+                            },
+                        ]}
+                        icon={({ size }) =>
+                            <MaterialCommunityIcons
+                                name={banner.type === 'success' ? 'check-circle' : banner.type === 'warning' ? 'alert' : 'alert-circle'}
+                                size={size}
+                                color={banner.type === 'success' ? '#4CAF50' : banner.type === 'warning' ? '#FF9800' : '#F44336'}
+                            />
+                        }
+                        style={{
+                            marginBottom: 16,
+                            backgroundColor: banner.type === 'success' ? '#E8F5E9' : banner.type === 'warning' ? '#FFF8E1' : '#FFEBEE',
+                        }}
+                    >
+                        {banner.message}
+                    </Banner>
+                )}
+
                 <Card style={styles.optimizeCard}>
                     <Card.Content>
                         <Text variant="headlineMedium">AI-Powered Optimization</Text>
@@ -133,6 +195,23 @@ export default function OptimizeScreen() {
                     <Card style={styles.resultsCard}>
                         <Card.Content>
                             <Text variant="titleLarge">Optimization Results</Text>
+
+                            {/* Show AI status if available */}
+                            {optimizationResult.aiSuccessful !== undefined && (
+                                <View style={styles.aiStatus}>
+                                    <MaterialCommunityIcons
+                                        name={optimizationResult.aiSuccessful ? "robot-happy" : "robot"}
+                                        size={24}
+                                        color={optimizationResult.aiSuccessful ? "#4CAF50" : "#757575"}
+                                    />
+                                    <Text style={{
+                                        marginLeft: 8,
+                                        color: optimizationResult.aiSuccessful ? "#4CAF50" : "#757575"
+                                    }}>
+                                        {optimizationResult.aiSuccessful ? "AI Optimized" : "Basic Optimization"}
+                                    </Text>
+                                </View>
+                            )}
 
                             <View style={styles.gainsContainer}>
                                 <View style={styles.gainItem}>
@@ -237,5 +316,11 @@ const styles = StyleSheet.create({
     metricsTitle: {
         marginBottom: 4,
         fontWeight: 'bold',
-    }
+    },
+    aiStatus: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 8,
+        marginBottom: 12,
+    },
 });

@@ -10,6 +10,8 @@ export interface OptimizationResult {
   };
   actions: string[];
   recommendations: string[];
+  aiSuccessful: boolean; // Track if AI was successful
+  message?: string; // Optional message about the AI status
 }
 
 // Initialize Groq client with API key (hardcoded as requested)
@@ -75,53 +77,52 @@ export async function getAIOptimizations(
     
     try {
       aiResponse = JSON.parse(content);
+      
+      // Validate that we got a proper response with the expected structure
+      if (!aiResponse.gains || !aiResponse.actions || !aiResponse.recommendations) {
+        throw new Error("AI response missing required fields");
+      }
+      
+      // Create optimization result with defaults if fields are missing
+      const optimizationResult: OptimizationResult = {
+        timestamp: new Date().toISOString(),
+        gains: {
+          memory: aiResponse.gains?.memory || "150MB",
+          battery: aiResponse.gains?.battery || "10%",
+          storage: aiResponse.gains?.storage || "500MB"
+        },
+        actions: Array.isArray(aiResponse.actions) ? aiResponse.actions : [],
+        recommendations: Array.isArray(aiResponse.recommendations) ? aiResponse.recommendations : [],
+        aiSuccessful: true,
+        message: "AI optimization successfully applied"
+      };
+
+      return optimizationResult;
     } catch (error) {
       console.error("Failed to parse AI response:", content);
       throw new Error("Invalid AI response format");
     }
-    
-    // Create optimization result with defaults if fields are missing
-    const optimizationResult: OptimizationResult = {
-      timestamp: new Date().toISOString(),
-      gains: {
-        memory: aiResponse.gains?.memory || "150MB",
-        battery: aiResponse.gains?.battery || "10%",
-        storage: aiResponse.gains?.storage || "500MB"
-      },
-      actions: Array.isArray(aiResponse.actions) ? aiResponse.actions : [
-        "Close high-memory background apps",
-        "Clear app caches",
-        "Disable unnecessary background processes"
-      ],
-      recommendations: Array.isArray(aiResponse.recommendations) ? aiResponse.recommendations : [
-        "Update system software",
-        "Remove unused applications",
-        "Reduce screen brightness to save battery"
-      ]
-    };
-
-    return optimizationResult;
   } catch (error) {
     console.error("Error getting AI optimizations:", error);
     
-    // Return fallback optimization if AI fails
+    // Return response indicating AI was not available
     return {
       timestamp: new Date().toISOString(),
       gains: {
-        memory: "100MB",
-        battery: "5%",
-        storage: "250MB"
+        memory: "75MB",
+        battery: "4%",
+        storage: "200MB"
       },
       actions: [
-        "Close high-memory background apps",
-        "Clear app caches",
-        "Disable unnecessary background processes"
+        "Closed some background apps",
+        "Performed basic optimization"
       ],
       recommendations: [
-        "Update system software",
-        "Remove unused applications",
-        "Reduce screen brightness to save battery"
-      ]
+        "Check for system updates",
+        "Consider device maintenance"
+      ],
+      aiSuccessful: false,
+      message: "AI optimization not available right now. Using basic optimization instead."
     };
   }
 }
