@@ -15,6 +15,7 @@ import HomeScreen from './screens/HomeScreen';
 import CoursesScreen from './screens/CoursesScreen';
 import OptimizeScreen from './screens/OptimizeScreen';
 import ProfileScreen from './screens/ProfileScreen';
+import AdvancedOptimizeScreen from './screens/AdvancedOptimizeScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -54,7 +55,7 @@ export default function App() {
                         />
                         <Tab.Screen
                             name="Optimize"
-                            component={OptimizeScreen}
+                            component={AdvancedOptimizeScreen}
                             options={{
                                 tabBarIcon: ({ color }) => (
                                     <MaterialCommunityIcons name="lightning-bolt" color={color} size={26} />
