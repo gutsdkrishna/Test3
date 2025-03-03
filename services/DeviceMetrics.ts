@@ -34,7 +34,7 @@ export async function collectDeviceMetrics(): Promise<DeviceMetrics> {
     let osVersion = 'Unknown OS';
     
     try {
-      deviceName = await Device.getDeviceNameAsync() || Device.modelName || 'Unknown Device';
+      deviceName = Device.modelName || 'Unknown Device';
     } catch (error) {
       console.warn("Error getting device name:", error);
     }

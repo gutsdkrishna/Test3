@@ -17,44 +17,105 @@ export default function AdvancedOptimizeScreen() {
         message: '',
         type: 'success'
     });
+    // New debugging states
+    const [debugSteps, setDebugSteps] = useState<Array<{ step: string, status: 'pending' | 'success' | 'error', message?: string }>>([]);
+    const [detailedError, setDetailedError] = useState<string | null>(null);
+
+    // Helper function to add debug steps
+    const addDebugStep = (step: string, status: 'pending' | 'success' | 'error', message?: string) => {
+        setDebugSteps(prev => [...prev, { step, status, message }]);
+    };
 
     const startOptimization = async () => {
+        // Reset all states
         setOptimizing(true);
         setOptResult(null);
         setStatusBanner({ visible: false, message: '', type: 'success' });
+        setDebugSteps([]);
+        setDetailedError(null);
 
         try {
             // Step 1: Collect device metrics directly from the device
-            console.log("Collecting device metrics...");
-            const metrics = await collectDeviceMetrics();
-            setDeviceMetrics(metrics);
+            addDebugStep("Collecting device metrics", "pending");
+            try {
+                const metrics = await collectDeviceMetrics();
+                setDeviceMetrics(metrics);
+                addDebugStep("Device metrics collected", "success");
+            } catch (err) {
+                if (err instanceof Error) {
+                    addDebugStep("Failed to collect device metrics", "error", err.message);
+                } else {
+                    addDebugStep("Failed to collect device metrics", "error", "Unknown error");
+                }
+                if (err instanceof Error) {
+                    throw new Error(`Device metrics error: ${err.message}`);
+                } else {
+                    throw new Error('Device metrics error: Unknown error');
+                }
+            }
 
             // Step 2: Use Groq AI to get advanced optimization recommendations
             if (aiEnabled) {
-                console.log("Getting advanced AI optimizations...");
-                const result = await getAdvancedAIOptimizations(metrics);
-                setOptResult(result);
+                addDebugStep("Initializing AI optimization request", "pending");
+                try {
+                    // Testing network connectivity to Groq API
+                    addDebugStep("Testing network connectivity to Groq API", "pending");
 
-                // Show appropriate message based on AI success
-                if (result.success) {
-                    setStatusBanner({
-                        visible: true,
-                        message: "AI optimization completed successfully!",
-                        type: 'success'
-                    });
-                } else {
-                    setStatusBanner({
-                        visible: true,
-                        message: "AI response not available right now.",
-                        type: 'error'
-                    });
+                    // Making the actual API request
+                    addDebugStep("Sending request to Groq API", "pending");
+                    const result = await getAdvancedAIOptimizations(deviceMetrics!);
+
+                    if (result && result.success) {
+                        addDebugStep("Received successful response from Groq API", "success");
+                        setOptResult(result);
+                        setStatusBanner({
+                            visible: true,
+                            message: "AI optimization completed successfully!",
+                            type: 'success'
+                        });
+                    } else {
+                        if (result) {
+                            addDebugStep("Received error response from Groq API", "error", result.message);
+                            setOptResult(result);
+                            setStatusBanner({
+                                visible: true,
+                                message: "AI response not available right now.",
+                                type: 'error'
+                            });
+                        } else {
+                            addDebugStep("Received undefined response from Groq API", "error");
+                            setStatusBanner({
+                                visible: true,
+                                message: "AI response not available right now.",
+                                type: 'error'
+                            });
+                        }
+                    }
+                } catch (err) {
+                    if (err instanceof Error) {
+                        addDebugStep("Error during AI optimization", "error", err.message);
+                    } else {
+                        addDebugStep("Error during AI optimization", "error", "Unknown error");
+                    }
+
+                    // Capture detailed error for debugging
+                    const errorDetails = `Error: ${(err as Error).message}\n\nStack: ${(err as Error).stack || 'No stack trace'}\n\nAdditional Info: ${JSON.stringify(err)}`;
+                    setDetailedError(errorDetails);
+
+                    if (err instanceof Error) {
+                        throw new Error(`AI optimization error: ${err.message}`);
+                    } else {
+                        throw new Error('AI optimization error: Unknown error');
+                    }
                 }
+            } else {
+                addDebugStep("AI optimization skipped (disabled by user)", "success");
             }
         } catch (error) {
             console.error("Advanced optimization error:", error);
             setStatusBanner({
                 visible: true,
-                message: "Optimization failed. Please try again.",
+                message: "Optimization failed. See debug info for details.",
                 type: 'error'
             });
         } finally {
@@ -156,6 +217,49 @@ export default function AdvancedOptimizeScreen() {
                     </Card.Actions>
                 </Card>
 
+                {/* Debug Steps Display */}
+                {debugSteps.length > 0 && (
+                    <Card style={styles.card}>
+                        <Card.Content>
+                            <Text variant="titleLarge">Debug Information</Text>
+                            <Divider style={styles.divider} />
+
+                            {debugSteps.map((step, index) => (
+                                <View key={index} style={styles.debugStep}>
+                                    <View style={styles.debugStepHeader}>
+                                        <Text style={{ fontWeight: 'bold' }}>{step.step}</Text>
+                                        <Chip
+                                            mode="flat"
+                                            style={{
+                                                backgroundColor:
+                                                    step.status === 'success' ? '#e6ffe6' :
+                                                        step.status === 'error' ? '#ffe6e6' : '#f0f0f0'
+                                            }}
+                                        >
+                                            {step.status}
+                                        </Chip>
+                                    </View>
+                                    {step.message && (
+                                        <Text style={styles.debugMessage}>
+                                            {step.message}
+                                        </Text>
+                                    )}
+                                </View>
+                            ))}
+
+                            {/* Detailed error information section */}
+                            {detailedError && (
+                                <View style={styles.detailedError}>
+                                    <Text style={{ fontWeight: 'bold', color: 'red' }}>Detailed Error Information:</Text>
+                                    <ScrollView style={styles.errorScroll}>
+                                        <Text style={styles.errorText}>{detailedError}</Text>
+                                    </ScrollView>
+                                </View>
+                            )}
+                        </Card.Content>
+                    </Card>
+                )}
+
                 <Card style={styles.card}>
                     <Card.Content>
                         <View style={styles.settingRow}>
@@ -172,6 +276,9 @@ export default function AdvancedOptimizeScreen() {
                     <View style={styles.loadingContainer}>
                         <ActivityIndicator size="large" color="#6200ee" />
                         <Text style={styles.loadingText}>Analyzing device and generating optimizations...</Text>
+                        <Text style={styles.loadingStep}>
+                            Current step: {debugSteps.length > 0 ? debugSteps[debugSteps.length - 1].step : 'Initializing...'}
+                        </Text>
                     </View>
                 )}
 
@@ -252,6 +359,46 @@ export default function AdvancedOptimizeScreen() {
 }
 
 const styles = StyleSheet.create({
+    // ... existing styles ...
+
+    // New styles for debugging
+    debugStep: {
+        marginBottom: 12,
+        padding: 8,
+        borderRadius: 4,
+        backgroundColor: '#f9f9f9',
+    },
+    debugStepHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    debugMessage: {
+        marginTop: 6,
+        fontSize: 12,
+        color: '#666',
+    },
+    detailedError: {
+        marginTop: 16,
+        padding: 10,
+        backgroundColor: '#fff0f0',
+        borderRadius: 4,
+    },
+    errorScroll: {
+        maxHeight: 200,
+        marginTop: 8,
+    },
+    errorText: {
+        fontSize: 12,
+        color: '#d00',
+        fontFamily: 'monospace',
+    },
+    loadingStep: {
+        marginTop: 8,
+        fontSize: 12,
+        color: '#666',
+    },
+    // ...existing styles remain the same...
     container: {
         flex: 1,
         backgroundColor: '#f5f5f5',
