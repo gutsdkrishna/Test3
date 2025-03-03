@@ -1,71 +1,118 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { StyleSheet, View, ScrollView, Animated, TouchableOpacity, Easing } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { StyleSheet, View, ScrollView, Modal } from 'react-native';
 import { Text, Card, Button, ActivityIndicator, ProgressBar } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { collectDeviceMetrics } from '../services/DeviceMetrics';
+import { useNavigation } from '@react-navigation/native';
+import type { StackNavigationProp } from '@react-navigation/stack';
+import { collectDeviceMetrics, type DeviceMetrics, type AppInfo } from '../services/DeviceMetrics';
+import { RootTabParamList } from '../types/navigation';
+import AnimatedCircularProgress from '../components/AnimatedCircularProgress';
 
-export default function HomeScreen({ navigation }: any) {
-    const [deviceStats, setDeviceStats] = useState<any>(null);
+type NavigationProp = StackNavigationProp<RootTabParamList, 'Home'>;
+
+// Detailed metrics modal component
+const DetailedMetricsModal = ({
+    visible,
+    onClose,
+    metrics,
+    apps
+}: {
+    visible: boolean;
+    onClose: () => void;
+    metrics: DeviceMetrics | null;
+    apps: AppInfo[];
+}) => {
+    return (
+        <Modal
+            animationType="slide"
+            transparent={false}
+            visible={visible}
+            onRequestClose={onClose}
+        >
+            <SafeAreaView style={styles.modalContainer}>
+                <View style={styles.modalHeader}>
+                    <Text variant="headlineMedium">Detailed System Metrics</Text>
+                    <Button onPress={onClose}>Close</Button>
+                </View>
+
+                <ScrollView contentContainerStyle={styles.modalContent}>
+                    <Card style={styles.detailCard}>
+                        <Card.Content>
+                            <Text variant="titleLarge">System Information</Text>
+                            <View style={styles.detailItem}>
+                                <Text>Device: {metrics?.deviceName || 'Unknown'}</Text>
+                            </View>
+                            <View style={styles.detailItem}>
+                                <Text>OS Version: {metrics?.osVersion || 'Unknown'}</Text>
+                            </View>
+                            <View style={styles.detailItem}>
+                                <Text>CPU Usage: {metrics?.cpuUsage || 0}%</Text>
+                                <ProgressBar progress={metrics?.cpuUsage / 100 || 0} color="#6200ee" style={styles.progressBar} />
+                            </View>
+                            <View style={styles.detailItem}>
+                                <Text>Memory Usage: {metrics?.memoryUsage || 0}%</Text>
+                                <ProgressBar progress={metrics?.memoryUsage / 100 || 0} color="#6200ee" style={styles.progressBar} />
+                            </View>
+                            <View style={styles.detailItem}>
+                                <Text>Battery: {metrics?.batteryLevel || 0}% ({metrics?.batteryState || 'unknown'})</Text>
+                                <ProgressBar progress={metrics?.batteryLevel / 100 || 0} color="#6200ee" style={styles.progressBar} />
+                            </View>
+                            <View style={styles.detailItem}>
+                                <Text>Storage Used: {metrics?.storageUsed || 0}%</Text>
+                                <ProgressBar progress={metrics?.storageUsed / 100 || 0} color="#6200ee" style={styles.progressBar} />
+                            </View>
+                        </Card.Content>
+                    </Card>
+
+                    <Card style={styles.detailCard}>
+                        <Card.Content>
+                            <Text variant="titleLarge">Running Applications</Text>
+
+                            {apps.map((app: AppInfo, index: number) => (
+                                <View key={index} style={styles.appItem}>
+                                    <Text variant="titleMedium">{app.name}</Text>
+                                    <Text>Package: {app.packageName}</Text>
+                                    <View style={styles.appMetrics}>
+                                        <View style={styles.appMetricItem}>
+                                            <Text variant="bodySmall">Memory</Text>
+                                            <Text variant="bodyMedium">{app.memoryUsage}MB</Text>
+                                        </View>
+                                        <View style={styles.appMetricItem}>
+                                            <Text variant="bodySmall">Battery Drain</Text>
+                                            <Text variant="bodyMedium">{app.batteryDrain}%/hr</Text>
+                                        </View>
+                                        <View style={styles.appMetricItem}>
+                                            <Text variant="bodySmall">Background</Text>
+                                            <Text variant="bodyMedium">{app.backgroundTime}min</Text>
+                                        </View>
+                                    </View>
+                                    <ProgressBar
+                                        progress={app.memoryUsage / 500}
+                                        color={app.memoryUsage > 200 ? "#ff4d4d" : "#6200ee"}
+                                        style={styles.progressBar}
+                                    />
+                                </View>
+                            ))}
+                        </Card.Content>
+                    </Card>
+                </ScrollView>
+            </SafeAreaView>
+        </Modal>
+    );
+};
+
+export default function HomeScreen() {
+    const [deviceMetrics, setDeviceMetrics] = useState<DeviceMetrics | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-
-    // Animation values
-    const cpuProgress = useRef(new Animated.Value(0)).current;
-    const memoryProgress = useRef(new Animated.Value(0)).current;
-    const batteryProgress = useRef(new Animated.Value(0)).current;
-    const storageProgress = useRef(new Animated.Value(0)).current;
-
-    const animateValues = (cpu: number, memory: number, battery: number, storage: number) => {
-        // Reset values
-        cpuProgress.setValue(0);
-        memoryProgress.setValue(0);
-        batteryProgress.setValue(0);
-        storageProgress.setValue(0);
-
-        // Animate to new values
-        Animated.parallel([
-            Animated.timing(cpuProgress, {
-                toValue: cpu / 100,
-                duration: 1000,
-                easing: Easing.out(Easing.ease),
-                useNativeDriver: false
-            }),
-            Animated.timing(memoryProgress, {
-                toValue: memory / 100,
-                duration: 1000,
-                easing: Easing.out(Easing.ease),
-                useNativeDriver: false
-            }),
-            Animated.timing(batteryProgress, {
-                toValue: battery / 100,
-                duration: 1000,
-                easing: Easing.out(Easing.ease),
-                useNativeDriver: false
-            }),
-            Animated.timing(storageProgress, {
-                toValue: storage / 100,
-                duration: 1000,
-                easing: Easing.out(Easing.ease),
-                useNativeDriver: false
-            })
-        ]).start();
-    };
+    const [detailsModalVisible, setDetailsModalVisible] = useState(false);
+    const navigation = useNavigation<NavigationProp>();
 
     useEffect(() => {
         const fetchStats = async () => {
             try {
-                setLoading(true);
                 const metrics = await collectDeviceMetrics();
-                setDeviceStats(metrics);
-
-                // Animate the progress bars
-                animateValues(
-                    metrics.cpuUsage,
-                    metrics.memoryUsage,
-                    metrics.batteryLevel,
-                    metrics.storageUsed
-                );
+                setDeviceMetrics(metrics);
             } catch (err) {
                 console.error(err);
                 setError('Failed to load device metrics');
@@ -76,15 +123,23 @@ export default function HomeScreen({ navigation }: any) {
 
         fetchStats();
 
-        // Refresh metrics every 30 seconds
-        const interval = setInterval(fetchStats, 30000);
+        // Set up refresh interval
+        const intervalId = setInterval(fetchStats, 30000); // Refresh every 30 seconds
 
-        return () => clearInterval(interval);
+        return () => clearInterval(intervalId);
     }, []);
 
-    const viewDetailedMetrics = () => {
-        // Navigate to detailed metrics screen with current device stats
-        navigation.navigate('DetailedMetrics', { deviceStats });
+    const showDetailsModal = () => {
+        setDetailsModalVisible(true);
+    };
+
+    const goToOptimize = () => {
+        try {
+            navigation.navigate('Optimize');
+        } catch (err) {
+            console.error("Navigation error:", err);
+            alert("Could not open the optimize screen. Please try again.");
+        }
     };
 
     return (
@@ -98,73 +153,63 @@ export default function HomeScreen({ navigation }: any) {
                     <>
                         <Card style={styles.card}>
                             <Card.Content>
-                                <View style={styles.cardHeader}>
-                                    <Text variant="titleLarge">Device Health</Text>
-                                    <TouchableOpacity onPress={viewDetailedMetrics}>
-                                        <MaterialCommunityIcons name="chart-bar" size={24} color="#6200ee" />
-                                    </TouchableOpacity>
+                                <Text variant="titleLarge">Device Health</Text>
+                                <View style={styles.metricsContainer}>
+                                    <View style={styles.metricItem}>
+                                        <AnimatedCircularProgress
+                                            value={deviceMetrics?.cpuUsage || 0}
+                                            color={deviceMetrics?.cpuUsage > 70 ? '#ff4d4d' : '#6200ee'}
+                                        />
+                                        <Text style={styles.metricLabel}>CPU</Text>
+                                    </View>
+                                    <View style={styles.metricItem}>
+                                        <AnimatedCircularProgress
+                                            value={deviceMetrics?.memoryUsage || 0}
+                                            color={deviceMetrics?.memoryUsage > 80 ? '#ff4d4d' : '#6200ee'}
+                                        />
+                                        <Text style={styles.metricLabel}>Memory</Text>
+                                    </View>
+                                    <View style={styles.metricItem}>
+                                        <AnimatedCircularProgress
+                                            value={deviceMetrics?.batteryLevel || 0}
+                                            color={deviceMetrics?.batteryLevel < 20 ? '#ff4d4d' : '#6200ee'}
+                                        />
+                                        <Text style={styles.metricLabel}>Battery</Text>
+                                    </View>
                                 </View>
-
-                                <View style={styles.statsContainer}>
-                                    <View style={styles.statItem}>
-                                        <Text variant="bodyLarge">CPU</Text>
-                                        <View style={styles.progressContainer}>
-                                            <ProgressBar
-                                                progress={cpuProgress as any}
-                                                color={deviceStats?.cpuUsage > 80 ? '#F44336' :
-                                                    deviceStats?.cpuUsage > 60 ? '#FF9800' : '#4CAF50'}
-                                                style={styles.progressBar}
-                                            />
-                                            <Text variant="headlineMedium">{deviceStats?.cpuUsage}%</Text>
-                                        </View>
-                                    </View>
-                                    <View style={styles.statItem}>
-                                        <Text variant="bodyLarge">Memory</Text>
-                                        <View style={styles.progressContainer}>
-                                            <ProgressBar
-                                                progress={memoryProgress as any}
-                                                color={deviceStats?.memoryUsage > 80 ? '#F44336' :
-                                                    deviceStats?.memoryUsage > 60 ? '#FF9800' : '#4CAF50'}
-                                                style={styles.progressBar}
-                                            />
-                                            <Text variant="headlineMedium">{deviceStats?.memoryUsage}%</Text>
-                                        </View>
-                                    </View>
-                                    <View style={styles.statItem}>
-                                        <Text variant="bodyLarge">Battery</Text>
-                                        <View style={styles.progressContainer}>
-                                            <ProgressBar
-                                                progress={batteryProgress as any}
-                                                color={deviceStats?.batteryLevel < 20 ? '#F44336' :
-                                                    deviceStats?.batteryLevel < 50 ? '#FF9800' : '#4CAF50'}
-                                                style={styles.progressBar}
-                                            />
-                                            <Text variant="headlineMedium">{deviceStats?.batteryLevel}%</Text>
-                                        </View>
-                                    </View>
+                                <View style={styles.storageSection}>
+                                    <Text variant="bodyMedium">Storage Used: {deviceMetrics?.storageUsed || 0}%</Text>
+                                    <ProgressBar
+                                        progress={deviceMetrics?.storageUsed ? deviceMetrics.storageUsed / 100 : 0}
+                                        color={deviceMetrics?.storageUsed > 90 ? '#ff4d4d' : '#6200ee'}
+                                        style={styles.storageBar}
+                                    />
                                 </View>
                             </Card.Content>
                             <Card.Actions>
-                                <Button onPress={viewDetailedMetrics}>View Details</Button>
+                                <Button onPress={showDetailsModal}>View Details</Button>
                             </Card.Actions>
                         </Card>
 
                         <Card style={styles.card}>
                             <Card.Content>
-                                <Text variant="titleLarge">Storage Usage</Text>
-                                <View style={styles.progressContainer}>
-                                    <ProgressBar
-                                        progress={storageProgress as any}
-                                        color={deviceStats?.storageUsed > 90 ? '#F44336' :
-                                            deviceStats?.storageUsed > 75 ? '#FF9800' : '#4CAF50'}
-                                        style={styles.progressBar}
-                                    />
-                                    <Text variant="headlineMedium">{deviceStats?.storageUsed}% Used</Text>
+                                <Text variant="titleLarge">Optimization Status</Text>
+                                <View style={styles.optimizationStatus}>
+                                    <Text>Last optimized: {new Date().toLocaleDateString()}</Text>
+                                    <Text style={styles.optimizationRecommendation}>
+                                        {deviceMetrics?.cpuUsage > 50 || deviceMetrics?.memoryUsage > 70
+                                            ? 'Optimization recommended'
+                                            : 'System running optimally'}
+                                    </Text>
                                 </View>
-                                <Text variant="bodyMedium">Last optimized: {new Date().toLocaleDateString()}</Text>
                             </Card.Content>
                             <Card.Actions>
-                                <Button mode="contained" onPress={() => navigation.navigate('Optimize')}>Optimize Now</Button>
+                                <Button
+                                    mode="contained"
+                                    onPress={goToOptimize}
+                                >
+                                    Optimize Now
+                                </Button>
                             </Card.Actions>
                         </Card>
                     </>
@@ -172,6 +217,13 @@ export default function HomeScreen({ navigation }: any) {
 
                 {error && <Text style={styles.error}>{error}</Text>}
             </ScrollView>
+
+            <DetailedMetricsModal
+                visible={detailsModalVisible}
+                onClose={() => setDetailsModalVisible(false)}
+                metrics={deviceMetrics}
+                apps={deviceMetrics?.installedApps || []}
+            />
         </SafeAreaView>
     );
 }
@@ -194,25 +246,34 @@ const styles = StyleSheet.create({
         marginBottom: 16,
         elevation: 4,
     },
-    cardHeader: {
+    metricsContainer: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 16,
-    },
-    statsContainer: {
+        justifyContent: 'space-around',
         marginTop: 16,
-    },
-    statItem: {
         marginBottom: 16,
     },
-    progressContainer: {
+    metricItem: {
+        alignItems: 'center',
+    },
+    metricLabel: {
+        marginTop: 8,
+        fontSize: 14,
+        fontWeight: '500',
+    },
+    storageSection: {
         marginTop: 8,
     },
-    progressBar: {
-        height: 10,
-        borderRadius: 5,
-        marginBottom: 5,
+    storageBar: {
+        height: 8,
+        borderRadius: 4,
+        marginTop: 8,
+    },
+    optimizationStatus: {
+        marginTop: 8,
+    },
+    optimizationRecommendation: {
+        marginTop: 8,
+        fontWeight: '500',
     },
     error: {
         color: 'red',
@@ -221,5 +282,47 @@ const styles = StyleSheet.create({
     },
     loader: {
         marginTop: 50
-    }
+    },
+    modalContainer: {
+        flex: 1,
+        backgroundColor: '#f5f5f5',
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#e0e0e0',
+        backgroundColor: '#ffffff',
+    },
+    modalContent: {
+        padding: 16,
+    },
+    detailCard: {
+        marginBottom: 16,
+    },
+    detailItem: {
+        marginVertical: 8,
+    },
+    progressBar: {
+        height: 6,
+        borderRadius: 3,
+        marginTop: 4,
+    },
+    appItem: {
+        marginVertical: 12,
+        padding: 8,
+        backgroundColor: '#f9f9f9',
+        borderRadius: 8,
+    },
+    appMetrics: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 8,
+        marginBottom: 4,
+    },
+    appMetricItem: {
+        alignItems: 'center',
+    },
 });
