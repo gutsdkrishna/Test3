@@ -15,7 +15,7 @@ export interface OptimizationResult {
 }
 
 // Initialize Groq client with API key (hardcoded as requested)
-const API_KEY = "gsk_MBnYq1bThZ9JTo4iQ0O6S1vIXRThV0lc3nvPUznzPiECFGSd";
+const API_KEY = "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";
 
 /**
  * Get AI-powered optimizations using Groq directly from the Android app

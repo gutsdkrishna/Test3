@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { collectDeviceMetrics, type DeviceMetrics } from '../services/DeviceMetrics';
 import { getAdvancedAIOptimizations, type AdvancedOptimizationResult } from '../services/AdvancedAIOptimization';
+import { getMockAIOptimizations } from '../services/MockAIOptimization';
 import AnimatedCircularProgress from '../components/AnimatedCircularProgress';
 
 export default function AdvancedOptimizeScreen() {
@@ -17,7 +18,7 @@ export default function AdvancedOptimizeScreen() {
         message: '',
         type: 'success'
     });
-    // New debugging states
+    // Debug states
     const [debugSteps, setDebugSteps] = useState<Array<{ step: string, status: 'pending' | 'success' | 'error', message?: string }>>([]);
     const [detailedError, setDetailedError] = useState<string | null>(null);
 
@@ -42,72 +43,57 @@ export default function AdvancedOptimizeScreen() {
                 setDeviceMetrics(metrics);
                 addDebugStep("Device metrics collected", "success");
             } catch (err) {
-                if (err instanceof Error) {
-                    addDebugStep("Failed to collect device metrics", "error", err.message);
-                } else {
-                    addDebugStep("Failed to collect device metrics", "error", "Unknown error");
-                }
-                if (err instanceof Error) {
-                    throw new Error(`Device metrics error: ${err.message}`);
-                } else {
-                    throw new Error('Device metrics error: Unknown error');
-                }
+                const errorMessage = err instanceof Error ? err.message : "Unknown error";
+                addDebugStep("Failed to collect device metrics", "error", errorMessage);
+                throw new Error(`Device metrics error: ${errorMessage}`);
             }
 
             // Step 2: Use Groq AI to get advanced optimization recommendations
-            if (aiEnabled) {
-                addDebugStep("Initializing AI optimization request", "pending");
+            if (aiEnabled && deviceMetrics) {
+                addDebugStep("Initializing optimization analysis", "pending");
                 try {
-                    // Testing network connectivity to Groq API
-                    addDebugStep("Testing network connectivity to Groq API", "pending");
+                    // Check if we're in a browser/Expo environment
+                    const isBrowserEnv = typeof window !== 'undefined';
 
-                    // Making the actual API request
-                    addDebugStep("Sending request to Groq API", "pending");
-                    const result = await getAdvancedAIOptimizations(deviceMetrics!);
+                    // Use appropriate implementation
+                    let result;
+                    if (isBrowserEnv) {
+                        addDebugStep("Detected browser environment, using mock AI implementation", "pending");
+                        result = getMockAIOptimizations(deviceMetrics);
+                        addDebugStep("Mock optimization complete", "success");
+                    } else {
+                        addDebugStep("Testing network connectivity to Groq API", "pending");
+                        addDebugStep("Sending request to Groq API", "pending");
+                        result = await getAdvancedAIOptimizations(deviceMetrics);
+                        addDebugStep("Received response from Groq API", "success");
+                    }
 
-                    if (result && result.success) {
-                        addDebugStep("Received successful response from Groq API", "success");
+                    if (result) {
                         setOptResult(result);
                         setStatusBanner({
                             visible: true,
-                            message: "AI optimization completed successfully!",
-                            type: 'success'
+                            message: result.success ? "Optimization completed successfully!" : "AI response not available right now.",
+                            type: result.success ? 'success' : 'error'
                         });
-                    } else {
-                        if (result) {
-                            addDebugStep("Received error response from Groq API", "error", result.message);
-                            setOptResult(result);
-                            setStatusBanner({
-                                visible: true,
-                                message: "AI response not available right now.",
-                                type: 'error'
-                            });
-                        } else {
-                            addDebugStep("Received undefined response from Groq API", "error");
-                            setStatusBanner({
-                                visible: true,
-                                message: "AI response not available right now.",
-                                type: 'error'
-                            });
-                        }
                     }
                 } catch (err) {
-                    if (err instanceof Error) {
-                        addDebugStep("Error during AI optimization", "error", err.message);
-                    } else {
-                        addDebugStep("Error during AI optimization", "error", "Unknown error");
-                    }
+                    const errorMessage = err instanceof Error ? err.message : "Unknown error";
+                    addDebugStep("Error during AI optimization", "error", errorMessage);
 
                     // Capture detailed error for debugging
-                    const errorDetails = `Error: ${(err as Error).message}\n\nStack: ${(err as Error).stack || 'No stack trace'}\n\nAdditional Info: ${JSON.stringify(err)}`;
+                    const stack = err instanceof Error ? err.stack || 'No stack trace' : 'No stack trace';
+                    const errorDetails = `Error: ${errorMessage}\n\nStack: ${stack}\n\nAdditional Info: ${JSON.stringify(err)}`;
                     setDetailedError(errorDetails);
 
-                    if (err instanceof Error) {
-                        throw new Error(`AI optimization error: ${err.message}`);
-                    } else {
-                        throw new Error('AI optimization error: Unknown error');
-                    }
+                    throw new Error(`AI optimization error: ${errorMessage}`);
                 }
+            } else if (!deviceMetrics) {
+                addDebugStep("Cannot proceed - device metrics not available", "error");
+                setStatusBanner({
+                    visible: true,
+                    message: "Unable to collect device metrics. Cannot proceed with optimization.",
+                    type: 'error'
+                });
             } else {
                 addDebugStep("AI optimization skipped (disabled by user)", "success");
             }
@@ -247,7 +233,6 @@ export default function AdvancedOptimizeScreen() {
                                 </View>
                             ))}
 
-                            {/* Detailed error information section */}
                             {detailedError && (
                                 <View style={styles.detailedError}>
                                     <Text style={{ fontWeight: 'bold', color: 'red' }}>Detailed Error Information:</Text>
@@ -359,46 +344,6 @@ export default function AdvancedOptimizeScreen() {
 }
 
 const styles = StyleSheet.create({
-    // ... existing styles ...
-
-    // New styles for debugging
-    debugStep: {
-        marginBottom: 12,
-        padding: 8,
-        borderRadius: 4,
-        backgroundColor: '#f9f9f9',
-    },
-    debugStepHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    debugMessage: {
-        marginTop: 6,
-        fontSize: 12,
-        color: '#666',
-    },
-    detailedError: {
-        marginTop: 16,
-        padding: 10,
-        backgroundColor: '#fff0f0',
-        borderRadius: 4,
-    },
-    errorScroll: {
-        maxHeight: 200,
-        marginTop: 8,
-    },
-    errorText: {
-        fontSize: 12,
-        color: '#d00',
-        fontFamily: 'monospace',
-    },
-    loadingStep: {
-        marginTop: 8,
-        fontSize: 12,
-        color: '#666',
-    },
-    // ...existing styles remain the same...
     container: {
         flex: 1,
         backgroundColor: '#f5f5f5',
@@ -449,6 +394,11 @@ const styles = StyleSheet.create({
         marginTop: 16,
         fontSize: 16,
     },
+    loadingStep: {
+        marginTop: 8,
+        fontSize: 12,
+        color: '#666',
+    },
     summaryContainer: {
         flexDirection: 'row',
         flexWrap: 'wrap',
@@ -497,5 +447,36 @@ const styles = StyleSheet.create({
     },
     actionButton: {
         marginLeft: 8,
+    },
+    debugStep: {
+        marginBottom: 12,
+        padding: 8,
+        borderRadius: 4,
+        backgroundColor: '#f9f9f9',
+    },
+    debugStepHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    debugMessage: {
+        marginTop: 6,
+        fontSize: 12,
+        color: '#666',
+    },
+    detailedError: {
+        marginTop: 16,
+        padding: 10,
+        backgroundColor: '#fff0f0',
+        borderRadius: 4,
+    },
+    errorScroll: {
+        maxHeight: 200,
+        marginTop: 8,
+    },
+    errorText: {
+        fontSize: 12,
+        color: '#d00',
+        fontFamily: 'monospace',
     },
 });

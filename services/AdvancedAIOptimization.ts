@@ -215,7 +215,10 @@ export async function getAdvancedAIOptimizations(
     // Initialize Groq client with error handling
     let groq;
     try {
-      groq = new Groq({ apiKey: GROQ_API_KEY });
+      groq = new Groq({ 
+        apiKey: GROQ_API_KEY,
+        dangerouslyAllowBrowser: true  // Enable browser environment
+      });
       debugLog("Groq client initialized successfully");
     } catch (error) {
       debugLog("Failed to initialize Groq client", {}, error);
