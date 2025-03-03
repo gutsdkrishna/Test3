@@ -1,3 +1,7 @@
+/**
+ * BoostIQ Pro Mobile App
+ * Updated: Metro cache should be cleared after this change
+ */
 import 'react-native-gesture-handler';
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';

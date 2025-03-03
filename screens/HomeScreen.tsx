@@ -2,14 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, ScrollView, Modal } from 'react-native';
 import { Text, Card, Button, ActivityIndicator, ProgressBar } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, NavigationProp } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { collectDeviceMetrics, type DeviceMetrics, type AppInfo } from '../services/DeviceMetrics';
 import { RootTabParamList } from '../types/navigation';
-import AnimatedCircularProgress from '../components/AnimatedCircularProgress';
-
-type NavigationProp = StackNavigationProp<RootTabParamList, 'Home'>;
-
+// Fix the import path to use the correct path resolution
+import AnimatedCircularProgress from './AnimatedCircularProgress';
 // Detailed metrics modal component
 const DetailedMetricsModal = ({
     visible,
@@ -47,19 +45,19 @@ const DetailedMetricsModal = ({
                             </View>
                             <View style={styles.detailItem}>
                                 <Text>CPU Usage: {metrics?.cpuUsage || 0}%</Text>
-                                <ProgressBar progress={metrics?.cpuUsage / 100 || 0} color="#6200ee" style={styles.progressBar} />
+                                <ProgressBar progress={(metrics?.cpuUsage ?? 0) / 100} color="#6200ee" style={styles.progressBar} />
                             </View>
                             <View style={styles.detailItem}>
                                 <Text>Memory Usage: {metrics?.memoryUsage || 0}%</Text>
-                                <ProgressBar progress={metrics?.memoryUsage / 100 || 0} color="#6200ee" style={styles.progressBar} />
+                                <ProgressBar progress={(metrics?.memoryUsage ?? 0) / 100} color="#6200ee" style={styles.progressBar} />
                             </View>
                             <View style={styles.detailItem}>
                                 <Text>Battery: {metrics?.batteryLevel || 0}% ({metrics?.batteryState || 'unknown'})</Text>
-                                <ProgressBar progress={metrics?.batteryLevel / 100 || 0} color="#6200ee" style={styles.progressBar} />
+                                <ProgressBar progress={(metrics?.batteryLevel ?? 0) / 100} color="#6200ee" style={styles.progressBar} />
                             </View>
                             <View style={styles.detailItem}>
                                 <Text>Storage Used: {metrics?.storageUsed || 0}%</Text>
-                                <ProgressBar progress={metrics?.storageUsed / 100 || 0} color="#6200ee" style={styles.progressBar} />
+                                <ProgressBar progress={(metrics?.storageUsed ?? 0) / 100} color="#6200ee" style={styles.progressBar} />
                             </View>
                         </Card.Content>
                     </Card>
@@ -106,7 +104,7 @@ export default function HomeScreen() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [detailsModalVisible, setDetailsModalVisible] = useState(false);
-    const navigation = useNavigation<NavigationProp>();
+    const navigation = useNavigation<NavigationProp<RootTabParamList>>();
 
     useEffect(() => {
         const fetchStats = async () => {
@@ -158,21 +156,21 @@ export default function HomeScreen() {
                                     <View style={styles.metricItem}>
                                         <AnimatedCircularProgress
                                             value={deviceMetrics?.cpuUsage || 0}
-                                            color={deviceMetrics?.cpuUsage > 70 ? '#ff4d4d' : '#6200ee'}
+                                            color={(deviceMetrics?.cpuUsage ?? 0) > 70 ? '#ff4d4d' : '#6200ee'}
                                         />
                                         <Text style={styles.metricLabel}>CPU</Text>
                                     </View>
                                     <View style={styles.metricItem}>
                                         <AnimatedCircularProgress
                                             value={deviceMetrics?.memoryUsage || 0}
-                                            color={deviceMetrics?.memoryUsage > 80 ? '#ff4d4d' : '#6200ee'}
+                                            color={(deviceMetrics?.memoryUsage ?? 0) > 80 ? '#ff4d4d' : '#6200ee'}
                                         />
                                         <Text style={styles.metricLabel}>Memory</Text>
                                     </View>
                                     <View style={styles.metricItem}>
                                         <AnimatedCircularProgress
                                             value={deviceMetrics?.batteryLevel || 0}
-                                            color={deviceMetrics?.batteryLevel < 20 ? '#ff4d4d' : '#6200ee'}
+                                            color={(deviceMetrics?.batteryLevel ?? 0) < 20 ? '#ff4d4d' : '#6200ee'}
                                         />
                                         <Text style={styles.metricLabel}>Battery</Text>
                                     </View>
@@ -181,7 +179,7 @@ export default function HomeScreen() {
                                     <Text variant="bodyMedium">Storage Used: {deviceMetrics?.storageUsed || 0}%</Text>
                                     <ProgressBar
                                         progress={deviceMetrics?.storageUsed ? deviceMetrics.storageUsed / 100 : 0}
-                                        color={deviceMetrics?.storageUsed > 90 ? '#ff4d4d' : '#6200ee'}
+                                        color={(deviceMetrics?.storageUsed ?? 0) > 90 ? '#ff4d4d' : '#6200ee'}
                                         style={styles.storageBar}
                                     />
                                 </View>
@@ -197,7 +195,7 @@ export default function HomeScreen() {
                                 <View style={styles.optimizationStatus}>
                                     <Text>Last optimized: {new Date().toLocaleDateString()}</Text>
                                     <Text style={styles.optimizationRecommendation}>
-                                        {deviceMetrics?.cpuUsage > 50 || deviceMetrics?.memoryUsage > 70
+                                        {(deviceMetrics?.cpuUsage ?? 0) > 50 || (deviceMetrics?.memoryUsage ?? 0) > 70
                                             ? 'Optimization recommended'
                                             : 'System running optimally'}
                                     </Text>
